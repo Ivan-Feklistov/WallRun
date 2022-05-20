@@ -14,6 +14,10 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnWallEventDelegate, float, WallSid
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOffWallEventDelegate);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FClimbEventDelegate, FVector, ImpactPoint);
 
+// logging to screen during PIE
+// e.g. Message = FString::Printf(TEXT("x: %f"), f)
+#define PrintToScreen(Duration, Message) GEngine->AddOnScreenDebugMessage(-1, Duration, FColor::White, Message) 
+
 
 UCLASS( ClassGroup=(Custom), meta=(BlueprintSpawnableComponent) )
 class WALLRUN_API UWallRunComponent : public UActorComponent
@@ -34,6 +38,18 @@ public:
 	// how much gravity applied to player on wall
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "WallRun")
 	float OnWallGravity;
+
+	// how much to launch player up the wall when start wall run
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "WallRun")
+	float LaunchOnStickUp;
+
+	// how much to launch player to side in direction the wall when start wall run
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "WallRun")
+	float LaunchOnStickSide;
+
+	// how much of velocity impulse is added to initial impulse along the wall
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "WallRun")
+	float MovementumAdjust;
 
 	UFUNCTION(Category = "WallJump")
 	void WallJump();
@@ -61,10 +77,6 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "WallRun")
 	float ClimbStrength;
 
-	// how much of velocity impulse is added to initial impulse along the wall
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "WallRun")
-	float MovementImpulseAdjust;
-
 	// least allowed deviation of movement from wall 0-1;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "WallRun")
 	float AllowedDeviationFromWall;
@@ -72,7 +84,8 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "WallRun")
 	USoundBase* WallRunSound;
 
-
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "WallRun")
+	bool DebugLog;
 
 protected:
 	// Called when the game starts
@@ -96,14 +109,9 @@ protected:
 	UFUNCTION()
 	void CoyoteTime_Elapsed();
 
-	FVector WallDirection;
-
 	float DefaultAirControl;
 
 	float DefaultGravity;
-
-	UPROPERTY(BlueprintReadOnly, Category = "WallJump")
-	FVector WallJumpVelocity;
 
 	// how long to stick to wall
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "WallRun")
@@ -112,17 +120,17 @@ protected:
 	UPROPERTY(BlueprintReadOnly, Category = "WallRun")
 	FVector WallNormal;
 
-	// if wall on the right side of character then 1.0f or if on the left side then -1.0f
 	UPROPERTY(BlueprintReadOnly, Category = "WallRun")
-	float WallSide;
+	FVector WallDirection;
+
+	float LastWallSide = 0.f;
 
 	// implement wallrunning state
 	UFUNCTION()
 	void StickToWall();
 
 	// stop wallrunning state
-	UFUNCTION()
-	void OffWall();
+
 
 	bool bOnFloor;
 
@@ -130,13 +138,29 @@ protected:
 
 public:	
 
-	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "WallRun")
+	UFUNCTION(BlueprintCallable, Category = "WallRun")
+	void OffWall();
+
+	UFUNCTION(BlueprintNativeEvent, Category = "WallRun")
 	void OnHit(AActor* SelfActor, AActor* OtherActor, FVector NormalImpulse, const FHitResult& Hit);
 
-	UFUNCTION(BlueprintCallable, Category = "WallRun")
+	// calculate whether player moves backwards, based on his look direction and velocity
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "WallRun")
 	bool IsCharacterMovingBackwards();
 
+	// calculate whether player is looking at the wall he sticked to using Threashold (0-1) for what is considered "looking at wall'
+	// where 1 - is perpendicular to the wall, and 0 - is parallel to the wall
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "WallRun")
+	bool IsCharacterLookingAtWall(float Threshold = 0.75f);
+
+	// calculate whether wall on the right side (1) or on the left side (-1) of character
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "WallRun")
+	float CalculateWallSide();
+
 	// event for blueprint to add actions when stick on wall
+	// 1 - wall on the right side of player
+	// -1 - wall on the left side of player
+	// 0 - player not on the wall
 	UPROPERTY(BlueprintAssignable, Category = "WallRun")
 	FOnWallEventDelegate OnWallEvent;
 

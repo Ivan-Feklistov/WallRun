@@ -9,6 +9,7 @@
 #include "Components/AudioComponent.h"
 #include "Kismet/GameplayStatics.h"
 
+
 // Sets default values for this component's properties
 UWallRunComponent::UWallRunComponent()
 {
@@ -21,7 +22,6 @@ UWallRunComponent::UWallRunComponent()
 	bCanJumpFromWall = false;
 	bClimbingLedge = false;
 	WallRunDuration = 3.0f;
-	WallJumpVelocity = FVector::ZeroVector;
 	LaunchStrengthNormal = 150.f;
 	LaunchStrengthLook = 400.f;
 	LaunchStrengthZ = 550.f;
@@ -29,11 +29,15 @@ UWallRunComponent::UWallRunComponent()
 	CoyoteTime = 0.2f;
 	OnWallGravity = 0.4f;
 	OnWallAirControl = 0.5f;
-	MovementImpulseAdjust = 0.1f;
+	LaunchOnStickUp = 400.f;
+	LaunchOnStickSide = 500.f;
+	MovementumAdjust = 0.1f;
 	ClimbStrength = 100.f;
 	AllowedDeviationFromWall = 0.35f;
+	DebugLog = false;
+	
 	AudioRunComp = CreateDefaultSubobject<UAudioComponent>("AudioComp");
-
+	
 }
 
 
@@ -47,7 +51,6 @@ void UWallRunComponent::BeginPlay()
 		AudioRunComp->SetSound(WallRunSound);
 	}
 
-
 	CompOwner = Cast<ACharacter>(GetOwner());
 	if (CompOwner)
 	{
@@ -57,6 +60,7 @@ void UWallRunComponent::BeginPlay()
 			CompOwner->OnActorHit.AddDynamic(this, &UWallRunComponent::OnHit);
 			DefaultGravity = MoveComp->GravityScale;
 			DefaultAirControl = MoveComp->AirControl;
+			WallDirection = FVector::ZeroVector;
 		}
 	}	
 }
@@ -67,16 +71,16 @@ void UWallRunComponent::OnHit_Implementation(AActor* SelfActor, AActor* OtherAct
 	float Verticality = FMath::RoundHalfFromZero(Hit.Normal.Z); // 0 for wall, 1 for floor
 
 	// check if player collided with wall
-	// @todo make array for channels on which player is able wallrun on
+	// @todo make array for channels on which player is able to wallrun on
 	if (Hit.Component->GetCollisionObjectType() == ECC_WorldStatic && MoveComp->IsFalling() && Verticality == 0.f && bOnWall == false)
 	{
-		UE_LOG(LogTemp, Log, TEXT("Wall Hit"));
+		if (DebugLog)
+			UE_LOG(LogTemp, Log, TEXT("Wall Hit"));
 		// detect if it's the same wall to not stick to it
 		FVector NewWallDirection = FVector::CrossProduct(FVector::UpVector, Hit.Normal);
 		if (NewWallDirection != WallDirection)
 		{
 			WallNormal = Hit.Normal;
-			WallJumpVelocity = WallNormal;
 			StickToWall();
 		}		
 	}
@@ -84,14 +88,14 @@ void UWallRunComponent::OnHit_Implementation(AActor* SelfActor, AActor* OtherAct
 	// check if ledge in front and climb it
 	if (Hit.Component->GetCollisionObjectType() == ECC_WorldStatic && MoveComp->IsFalling() && Verticality == 0.f && bOnWall == true && bClimbingLedge == false)
 	{
-		float LookAtWall = FVector::DotProduct(-WallNormal, CompOwner->GetActorForwardVector());
 		FHitResult LedgeHit;
 		FVector Start = CompOwner->GetActorLocation() + FVector(0.f, 0.f, 50.f);
 		FVector End = Start + (-WallNormal) * 100.f;
 		GetWorld()->LineTraceSingleByChannel(LedgeHit, Start, End, ECC_Visibility);
-		if (LedgeHit.bBlockingHit == false && LookAtWall > 0.75f)
+		if (LedgeHit.bBlockingHit == false && IsCharacterLookingAtWall())
 		{
-			UE_LOG(LogTemp, Log, TEXT("Climb"));
+			if (DebugLog)
+				UE_LOG(LogTemp, Log, TEXT("Climb ledge"));
 			bClimbingLedge = true;
 			OffWall();
 			ClimbEvent.Broadcast(Hit.ImpactPoint);
@@ -101,7 +105,8 @@ void UWallRunComponent::OnHit_Implementation(AActor* SelfActor, AActor* OtherAct
 	//check if player collided with floor
 	if (Hit.Component->GetCollisionObjectType() == ECC_WorldStatic && Verticality == 1.f && bOnFloor == false )
 	{
-		UE_LOG(LogTemp, Log, TEXT("Floor Hit"));
+		if (DebugLog)
+			UE_LOG(LogTemp, Log, TEXT("Floor Hit"));
 		bOnFloor = true;
 		bClimbingLedge = false;
 		if (bOnWall)
@@ -116,10 +121,12 @@ void UWallRunComponent::OnHit_Implementation(AActor* SelfActor, AActor* OtherAct
 
 void UWallRunComponent::StickToWall()
 {
-	UE_LOG(LogTemp, Log, TEXT("Stick to wall"));
+	if (DebugLog)
+		UE_LOG(LogTemp, Log, TEXT("Stick to wall"));
 	bOnWall = true;
 	bCanJumpFromWall = true;
 	bOnFloor = false;
+	bClimbingLedge = false;
 	GetWorld()->GetTimerManager().ClearTimer(TimerHandle_WallRun);
 	GetWorld()->GetTimerManager().ClearTimer(TimerHandle_CoyoteTime);
 
@@ -128,38 +135,34 @@ void UWallRunComponent::StickToWall()
 	MoveComp->GravityScale = OnWallGravity;
 	MoveComp->AirControl = OnWallAirControl;
 
-	// calculate wall direction and whether wall on the right side (1) or on the left side (-1) of character
-	FVector CharVelocity = MoveComp->Velocity;
-	CharVelocity.Normalize();
+	// calculate wall direction
 	WallDirection = FVector::CrossProduct(FVector::UpVector, WallNormal);
-	FVector WallDirectionNorm = WallDirection;
-	WallDirectionNorm.Normalize();
-	WallSide = FVector::DotProduct(WallDirectionNorm, CharVelocity);
-	if (WallSide < 0.f)
-	{
-		WallSide = -1.f;
-	}
-	else
-	{
-		WallSide = 1.f;
-	}
 
-	// give movement impulse to player along the wall in the direction of velocity and slightly up
-	WallDirectionNorm = WallDirectionNorm * WallSide;
-	FVector Velocity = MoveComp->Velocity;
-	float MovementImpulse = Velocity.Size() * MovementImpulseAdjust;
-	Velocity.Normalize();
-	Velocity.Z = 0.f;
+	// calculate whether wall on the right side (1) or on the left side (-1) of character
+	float WallSide = CalculateWallSide();
+	LastWallSide = WallSide;
+	
+	FVector WallDirectionSide = WallDirectionSide * WallSide; // make WallDirection point to the same direction as player
+
+	// calculate how much (strong) player is trying to move into the wall 
 	FVector DirectionalStrength = MoveComp->GetLastInputVector();
-	float StrengthOfSideLaunch = FVector::DotProduct(WallDirectionNorm, DirectionalStrength);
+	float StrengthOfSideLaunch = FVector::DotProduct(WallDirectionSide, DirectionalStrength);
 	StrengthOfSideLaunch = FMath::Abs(StrengthOfSideLaunch);
+
 	// dont launch player along the wall if he touches wall moving backwards
 	if (IsCharacterMovingBackwards())
 	{
 		StrengthOfSideLaunch = StrengthOfSideLaunch * 0.2;
 	}
 
-	FVector LaunchVelocity = FVector::UpVector * 400 + (WallDirectionNorm * 500 * StrengthOfSideLaunch) + (Velocity * MovementImpulse);
+	// give movement impulse to player along the wall in the direction of velocity and slightly up
+	FVector Velocity = MoveComp->Velocity;
+	float MovementImpulse = Velocity.Size();
+	Velocity.Normalize();
+	Velocity.Z = 0.f;
+	// LaunchVelocity = (strength up) + (Strength in direction of look along the wall) + (Strength of momentum)
+	FVector LaunchVelocity = (FVector::UpVector * LaunchOnStickUp) + (WallDirectionSide * LaunchOnStickSide * StrengthOfSideLaunch) + 
+								(Velocity * MovementImpulse * MovementumAdjust);
 	CompOwner->LaunchCharacter(LaunchVelocity, true, true);
 	
 	// play sound of wallrunning
@@ -167,6 +170,7 @@ void UWallRunComponent::StickToWall()
 	{
 		AudioRunComp->Play();
 	}	
+	// in blueprint: if no mouse input make camera look forward along the wall
 	OnWallEvent.Broadcast(WallSide);
 	
 }
@@ -175,13 +179,16 @@ void UWallRunComponent::StickToWall()
 
 void UWallRunComponent::OffWall()
 {
-	UE_LOG(LogTemp, Log, TEXT("Unstick form wall"));
+	if (DebugLog)
+		UE_LOG(LogTemp, Log, TEXT("Unstick form wall"));
 	GetWorld()->GetTimerManager().ClearTimer(TimerHandle_CoyoteTime);
 	GetWorld()->GetTimerManager().ClearTimer(TimerHandle_WallRun);
 	bOnWall = false;	
 	MoveComp->GravityScale = DefaultGravity;
 	MoveComp->AirControl = DefaultAirControl;
+	LastWallSide = 0.f;
 	OffWallEvent.Broadcast();
+
 	// coyote time for jump from wall
 	GetWorld()->GetTimerManager().SetTimer(TimerHandle_CoyoteTime, this, &UWallRunComponent::CoyoteTime_Elapsed, CoyoteTime, false);
 	if (WallRunSound && AudioRunComp != nullptr)
@@ -199,20 +206,20 @@ void UWallRunComponent::WallJump()
 {
 	if (bCanJumpFromWall)
 	{
-		UE_LOG(LogTemp, Log, TEXT("Wall jump"));
+		if (DebugLog)
+			UE_LOG(LogTemp, Log, TEXT("Wall jump"));
 		bCanJumpFromWall = false;
 		OffWall();
 		FVector Velocity = MoveComp->Velocity;
 		float MovementImpulse = Velocity.Size();
 		Velocity.Normalize();
 		Velocity.Z = 0.f;
-		WallJumpVelocity = (WallJumpVelocity * LaunchStrengthNormal) + (MoveComp->GetLastInputVector() * LaunchStrengthLook) +
- 							(FVector(0.f, 0.f, 1.f) * LaunchStrengthZ) + (Velocity * MovementImpulse);
+		// WallJumpVelocity = (strength away from wall) + (strength in direction of player input movement) + (strength up) + (momentum)
+		FVector WallJumpVelocity = (WallNormal * LaunchStrengthNormal) + (MoveComp->GetLastInputVector() * LaunchStrengthLook) +
+ 							(FVector::UpVector * LaunchStrengthZ) + (Velocity * MovementImpulse);
 		WallJumpVelocity = UKismetMathLibrary::ClampVectorSize(WallJumpVelocity, 0.f, MaxWallJumpVelocity);
 		CompOwner->LaunchCharacter(WallJumpVelocity, true, true);
-		WallJumpVelocity = FVector::ZeroVector;
 	}
-	
 }
 
 
@@ -222,10 +229,46 @@ bool UWallRunComponent::IsCharacterMovingBackwards()
 	{
 		return false;
 	}
-	FVector VelNorm = MoveComp->Velocity;
-	VelNorm.Normalize();
-	float MovementDirection = FVector::DotProduct(CompOwner->GetActorForwardVector(), VelNorm);
+	// calculate how relative actor look direction to direction of movement 
+	FVector Velocity = MoveComp->Velocity;
+	Velocity.Normalize();
+	// if negative then player looks in the opposite direction from movement, meaning - moves backwards
+	float MovementDirection = FVector::DotProduct(CompOwner->GetActorForwardVector(), Velocity);
 	return MovementDirection < 0.0f ? true : false;
+}
+
+bool UWallRunComponent::IsCharacterLookingAtWall(float Threshold)
+{
+	if (CompOwner && bOnWall)
+	{
+		float LookAtWall = FVector::DotProduct(-WallNormal, CompOwner->GetActorForwardVector());
+		if (LookAtWall > Threshold)
+		{
+			return true;
+		}
+		return false;
+	}
+	return false;
+}
+
+float UWallRunComponent::CalculateWallSide()
+{
+	if (!CompOwner || !MoveComp || WallDirection.IsZero() || !bOnWall)
+	{
+		return 0.f;
+	}
+
+	FVector CharVelocity = MoveComp->Velocity;
+	CharVelocity.Normalize();
+	float WallSide = FVector::DotProduct(WallDirection, CharVelocity);
+	if (WallSide < 0.f)
+	{
+		return -1.f;
+	}
+	else
+	{
+		return 1.f;
+	}
 }
 
 // Called every frame
@@ -239,10 +282,12 @@ void UWallRunComponent::TickComponent(float DeltaTime, ELevelTick TickType, FAct
 		FVector CharVelocity = MoveComp->Velocity;
 		CharVelocity.Normalize();
 		float DeviationFromWall = FVector::DotProduct(WallNormal, CharVelocity);
+		
 		if (DeviationFromWall > AllowedDeviationFromWall)
 		{
 			OffWall();
-			UE_LOG(LogTemp, Log, TEXT("Moved away from wall"));
+			if (DebugLog)
+				UE_LOG(LogTemp, Log, TEXT("Moved away from wall"));
 		}
 
 		// stop wallrunning if wall ends (detect edge of wall)

@@ -36,8 +36,17 @@ class AWallRunCharacter : public ACharacter
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Camera, meta = (AllowPrivateAccess = "true"))
 	UCameraComponent* FirstPersonCameraComponent;
 
+	// new added here
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = WallRun, meta = (AllowPrivateAccess = "true"))
 	UWallRunComponent* WallRunComp;
+
+	DECLARE_DELEGATE_OneParam(FCrouchInputDelegate, const bool);
+
+	// Crouch action
+	virtual void Crouch(bool bClientSimulation /*= false */) override;
+
+	// end new added
 
 public:
 	AWallRunCharacter();
@@ -117,6 +126,8 @@ protected:
 	// APawn interface
 	virtual void SetupPlayerInputComponent(UInputComponent* InputComponent) override;
 	// End of APawn interface
+
+
 
 	
 

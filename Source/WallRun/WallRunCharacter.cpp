@@ -83,6 +83,9 @@ void AWallRunCharacter::SetupPlayerInputComponent(class UInputComponent* PlayerI
 	// Bind jump events
 	PlayerInputComponent->BindAction("Jump", IE_Pressed, this, &ACharacter::Jump);
 	PlayerInputComponent->BindAction("Jump", IE_Released, this, &ACharacter::StopJumping);
+	// @todo crouch for bunnyhop and unstick wall
+	PlayerInputComponent->BindAction<FCrouchInputDelegate>("Crouch", IE_Pressed, this, &AWallRunCharacter::Crouch, false);
+	PlayerInputComponent->BindAction<FCrouchInputDelegate>("Crouch", IE_Released, this, &ACharacter::UnCrouch, false);
 
 	// Bind fire event
 	PlayerInputComponent->BindAction("Fire", IE_Pressed, this, &AWallRunCharacter::OnFire);
@@ -98,6 +101,19 @@ void AWallRunCharacter::SetupPlayerInputComponent(class UInputComponent* PlayerI
 	PlayerInputComponent->BindAxis("TurnRate", this, &AWallRunCharacter::TurnAtRate);
 	PlayerInputComponent->BindAxis("LookUp", this, &APawn::AddControllerPitchInput);
 	PlayerInputComponent->BindAxis("LookUpRate", this, &AWallRunCharacter::LookUpAtRate);
+
+}
+
+void AWallRunCharacter::Crouch(bool bClientSimulation /* = false */)
+{
+	Super::Crouch(bClientSimulation);
+	if (WallRunComp)
+	{
+		if (WallRunComp->bOnWall)
+		{
+			WallRunComp->OffWall();
+		}
+	}
 }
 
 void AWallRunCharacter::Jump()
@@ -193,10 +209,29 @@ void AWallRunCharacter::MoveForward(float Value)
 
 void AWallRunCharacter::MoveRight(float Value)
 {
-	if (Value != 0.0f)
+	if (!WallRunComp)
 	{
-		// add movement in that direction
-		AddMovementInput(GetActorRightVector(), Value);
+		if (Value != 0.0f)
+		{
+			// add movement in that direction
+			AddMovementInput(GetActorRightVector(), Value);
+		}
+	}
+	else
+	{
+		if (Value != 0.0f)
+		{
+			if (WallRunComp->bOnWall)
+			{
+				// don't let player move backwards on wall, only brake
+				if (WallRunComp->IsCharacterMovingBackwards() && WallRunComp->IsCharacterLookingAtWall(0.15f))
+				{
+					Value = 0.0f;
+				}
+			}
+			// add movement in that direction
+			AddMovementInput(GetActorRightVector(), Value);
+		}
 	}
 }
 
