@@ -28,6 +28,9 @@ public:
 	// Sets default values for this component's properties
 	UWallRunComponent();
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "WallRun")
+	TArray<TEnumAsByte<ECollisionChannel>> ObjectTypesForWallRun;
+
 	UPROPERTY(BlueprintReadOnly, Category = "WallRun")
 	bool bOnWall;
 
@@ -84,23 +87,26 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "WallRun")
 	USoundBase* WallRunSound;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "WallRun")
-	bool DebugLog;
 
 protected:
 	// Called when the game starts
 	virtual void BeginPlay() override;
 
+	UPROPERTY()
 	UAudioComponent* AudioRunComp;
 
 	// reference to player's character
+	UPROPERTY()
 	ACharacter* CompOwner;
 
 	// reference to player's CharacterMovementComponent
+	UPROPERTY()
 	UCharacterMovementComponent* MoveComp;
 
+	UPROPERTY()
 	FTimerHandle TimerHandle_WallRun;
 
+	UPROPERTY()
 	FTimerHandle TimerHandle_CoyoteTime;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "WallJump")
@@ -109,8 +115,10 @@ protected:
 	UFUNCTION()
 	void CoyoteTime_Elapsed();
 
+	UPROPERTY()
 	float DefaultAirControl;
 
+	UPROPERTY()
 	float DefaultGravity;
 
 	// how long to stick to wall
@@ -123,21 +131,27 @@ protected:
 	UPROPERTY(BlueprintReadOnly, Category = "WallRun")
 	FVector WallDirection;
 
+	UPROPERTY()
 	float LastWallSide = 0.f;
 
 	// implement wallrunning state
 	UFUNCTION()
 	void StickToWall();
 
-	// stop wallrunning state
 
 
+	UPROPERTY()
 	bool bOnFloor;
 
+	UPROPERTY()
 	bool bClimbingLedge;
 
 public:	
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "WallRun")
+	bool DebugLog;
+
+	// stop wallrunning state
 	UFUNCTION(BlueprintCallable, Category = "WallRun")
 	void OffWall();
 

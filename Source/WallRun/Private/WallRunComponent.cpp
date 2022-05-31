@@ -71,8 +71,7 @@ void UWallRunComponent::OnHit_Implementation(AActor* SelfActor, AActor* OtherAct
 	float Verticality = FMath::RoundHalfFromZero(Hit.Normal.Z); // 0 for wall, 1 for floor
 
 	// check if player collided with wall
-	// @todo make array for channels on which player is able to wallrun on
-	if (Hit.Component->GetCollisionObjectType() == ECC_WorldStatic && MoveComp->IsFalling() && Verticality == 0.f && bOnWall == false)
+	if (ObjectTypesForWallRun.Contains(Hit.Component->GetCollisionObjectType()) && MoveComp->IsFalling() && Verticality == 0.f && bOnWall == false)
 	{
 		if (DebugLog)
 			UE_LOG(LogTemp, Log, TEXT("Wall Hit"));
@@ -86,8 +85,9 @@ void UWallRunComponent::OnHit_Implementation(AActor* SelfActor, AActor* OtherAct
 	}
 
 	// check if ledge in front and climb it
-	if (Hit.Component->GetCollisionObjectType() == ECC_WorldStatic && MoveComp->IsFalling() && Verticality == 0.f && bOnWall == true && bClimbingLedge == false)
+	if (ObjectTypesForWallRun.Contains(Hit.Component->GetCollisionObjectType()) && MoveComp->IsFalling() && Verticality == 0.f && bOnWall == true && bClimbingLedge == false)
 	{
+		// @todo change way to detect ledge to L-like trace
 		FHitResult LedgeHit;
 		FVector Start = CompOwner->GetActorLocation() + FVector(0.f, 0.f, 50.f);
 		FVector End = Start + (-WallNormal) * 100.f;
@@ -103,7 +103,7 @@ void UWallRunComponent::OnHit_Implementation(AActor* SelfActor, AActor* OtherAct
 	}
 
 	//check if player collided with floor
-	if (Hit.Component->GetCollisionObjectType() == ECC_WorldStatic && Verticality == 1.f && bOnFloor == false )
+	if (ObjectTypesForWallRun.Contains(Hit.Component->GetCollisionObjectType()) && Verticality == 1.f && bOnFloor == false || !MoveComp->IsFalling())
 	{
 		if (DebugLog)
 			UE_LOG(LogTemp, Log, TEXT("Floor Hit"));
@@ -160,9 +160,9 @@ void UWallRunComponent::StickToWall()
 	float MovementImpulse = Velocity.Size();
 	Velocity.Normalize();
 	Velocity.Z = 0.f;
-	// LaunchVelocity = (strength up) + (Strength in direction of look along the wall) + (Strength of momentum)
+	// LaunchVelocity = (strength up) + (Strength in direction of look along the wall) + (Strength of momentum) + (impulse into wall)
 	FVector LaunchVelocity = (FVector::UpVector * LaunchOnStickUp) + (WallDirectionSide * LaunchOnStickSide * StrengthOfSideLaunch) + 
-								(Velocity * MovementImpulse * MovementumAdjust);
+								(Velocity * MovementImpulse * MovementumAdjust) + (-WallNormal * 100.f);
 	CompOwner->LaunchCharacter(LaunchVelocity, true, true);
 	
 	// play sound of wallrunning
