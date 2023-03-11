@@ -10,7 +10,7 @@
 class UCharacterMovementComponent;
 class UAudioComponent;
 
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnWallEventDelegate, float, WallSide);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnWallEventDelegate, FVector, WallNormal);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOffWallEventDelegate);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FClimbEventDelegate, FVector, ImpactPoint);
 

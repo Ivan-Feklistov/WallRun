@@ -139,14 +139,14 @@ void UWallRunComponent::StickToWall()
 	WallDirection = FVector::CrossProduct(FVector::UpVector, WallNormal);
 
 	// calculate whether wall on the right side (1) or on the left side (-1) of character
-	float WallSide = CalculateWallSide();
-	LastWallSide = WallSide;
+	const float WallSide = CalculateWallSide();
+	//LastWallSide = WallSide;
 	
-	FVector WallDirectionSide = WallDirectionSide * WallSide; // make WallDirection point to the same direction as player
+	const FVector WallDirectionSide = WallDirection * WallSide; // make WallDirection point to the same direction as player
 
 	// calculate how much (strong) player is trying to move into the wall 
-	FVector DirectionalStrength = MoveComp->GetLastInputVector();
-	float StrengthOfSideLaunch = FVector::DotProduct(WallDirectionSide, DirectionalStrength);
+	const FVector DirectionalStrength = MoveComp->GetLastInputVector();
+	float StrengthOfSideLaunch = FVector::DotProduct(WallDirection, DirectionalStrength);
 	StrengthOfSideLaunch = FMath::Abs(StrengthOfSideLaunch);
 
 	// dont launch player along the wall if he touches wall moving backwards
@@ -171,7 +171,7 @@ void UWallRunComponent::StickToWall()
 		AudioRunComp->Play();
 	}	
 	// in blueprint: if no mouse input make camera look forward along the wall
-	OnWallEvent.Broadcast(WallSide);
+	OnWallEvent.Broadcast(WallNormal);
 	
 }
 
