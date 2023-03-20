@@ -52,10 +52,14 @@ class AWallRunCharacter : public ACharacter
 	// end new added
 
 public:
-	AWallRunCharacter();
+	AWallRunCharacter(const FObjectInitializer& ObjectInitializer);
 
 protected:
 	virtual void BeginPlay();
+
+	virtual void Tick(float DeltaTime) override;
+	
+	void UpdateCrouch(float DeltaSeconds);
 
 public:
 	/** Base turn rate, in deg/sec. Other scaling may affect final turn rate. */
@@ -85,9 +89,26 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Gameplay)
 	UAnimMontage* FireAnimation;
 
-	/** Whether to use motion controller location for aiming. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Gameplay)
-	uint8 bUsingMotionControllers : 1;
+	float CrouchHalfHeight;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Gameplay)
+	float CrouchCameraOffset;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Gameplay)
+	float StandHalfHeight;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Gameplay)
+	float StandCameraOffset;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Gameplay)
+	float CrouchSpeed;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Gameplay)
+	bool bCrouchDisabled;
+
+	UPROPERTY(BlueprintReadWrite, Category = Gameplay)
+	bool bWantsToCrouch;
 
 protected:
 	
@@ -114,23 +135,13 @@ protected:
 	 * @param Rate	This is a normalized rate, i.e. 1.0 means 100% of desired turn rate
 	 */
 	void LookUpAtRate(float Rate);
-
-	struct TouchData
-	{
-		TouchData() { bIsPressed = false;Location=FVector::ZeroVector;}
-		bool bIsPressed;
-		ETouchIndex::Type FingerIndex;
-		FVector Location;
-		bool bMoved;
-	};
-
 	
 protected:
 	// APawn interface
 	virtual void SetupPlayerInputComponent(UInputComponent* InputComponent) override;
 	// End of APawn interface
-
-
+	virtual bool CanCrouch() const override;
+	// bool DoCrouch;
 
 	
 
@@ -142,6 +153,9 @@ public:
 
 	//UFUNCTION(BlueprintCallable, Category = Character)
 	//bool CanJump() const override;
+
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Crouching")
+	bool IsCrouching() const;
 
 	virtual void Jump() override;
 

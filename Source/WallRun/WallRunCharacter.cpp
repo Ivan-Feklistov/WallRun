@@ -1,6 +1,8 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "WallRunCharacter.h"
+
+#include "WallCharacterMovementComponent.h"
 #include "WallRunProjectile.h"
 #include "Animation/AnimInstance.h"
 #include "Camera/CameraComponent.h"
@@ -17,7 +19,8 @@ DEFINE_LOG_CATEGORY_STATIC(LogFPChar, Warning, All);
 //////////////////////////////////////////////////////////////////////////
 // AWallRunCharacter
 
-AWallRunCharacter::AWallRunCharacter()
+AWallRunCharacter::AWallRunCharacter(const FObjectInitializer& ObjectInitializer)
+: Super(ObjectInitializer.SetDefaultSubobjectClass<UWallCharacterMovementComponent>(ACharacter::CharacterMovementComponentName))
 {
 	// Set size for collision capsule
 	GetCapsuleComponent()->InitCapsuleSize(55.f, 96.0f);
@@ -62,8 +65,14 @@ AWallRunCharacter::AWallRunCharacter()
 	// Default offset from the character location for projectiles to spawn
 	GunOffset = FVector(100.0f, 0.0f, 10.0f);
 
-	// Note: The ProjectileClass and the skeletal mesh/anim blueprints for Mesh1P, FP_Gun, and VR_Gun 
-	// are set in the derived blueprint asset named MyCharacter to avoid direct content references in C++..
+	CrouchHalfHeight = 50.f;
+	CrouchCameraOffset = 45.f;
+
+	StandHalfHeight = 88.f;
+	StandCameraOffset = 70.f;
+
+	CrouchSpeed = 200.f;
+	bCrouchDisabled = false;
 
 }
 
@@ -74,6 +83,13 @@ void AWallRunCharacter::BeginPlay()
 
 	//Attach gun mesh component to Skeleton, doing it here because the skeleton is not yet created in the constructor
 	FP_Gun->AttachToComponent(Mesh1P, FAttachmentTransformRules(EAttachmentRule::SnapToTarget, true), TEXT("GripPoint"));
+}
+
+void AWallRunCharacter::Tick(float DeltaTime)
+{
+	Super::Tick(DeltaTime);
+
+	UpdateCrouch(DeltaTime);
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -89,7 +105,7 @@ void AWallRunCharacter::SetupPlayerInputComponent(class UInputComponent* PlayerI
 	PlayerInputComponent->BindAction("Jump", IE_Released, this, &ACharacter::StopJumping);
 	// @todo crouch for bunnyhop and unstick wall
 	PlayerInputComponent->BindAction<FCrouchInputDelegate>("Crouch", IE_Pressed, this, &AWallRunCharacter::Crouch, false);
-	PlayerInputComponent->BindAction<FCrouchInputDelegate>("Crouch", IE_Released, this, &ACharacter::UnCrouch, false);
+	// PlayerInputComponent->BindAction<FCrouchInputDelegate>("Crouch", IE_Released, this, &ACharacter::UnCrouch, false);
 
 	// Bind fire event
 	PlayerInputComponent->BindAction("Fire", IE_Pressed, this, &AWallRunCharacter::OnFire);
@@ -108,16 +124,75 @@ void AWallRunCharacter::SetupPlayerInputComponent(class UInputComponent* PlayerI
 
 }
 
+bool AWallRunCharacter::CanCrouch() const
+{
+	return GetCharacterMovement()->CanEverCrouch() && GetRootComponent() && !GetRootComponent()->IsSimulatingPhysics() && !bCrouchDisabled;
+}
+
 void AWallRunCharacter::Crouch(bool bClientSimulation /* = false */)
 {
-	Super::Crouch(bClientSimulation);
+	//Super::Crouch(bClientSimulation);
 	if (WallRunComp)
 	{
 		if (WallRunComp->bOnWall)
 		{
 			WallRunComp->OffWall();
+			return;
+		}
+	}			
+	bWantsToCrouch = !(bWantsToCrouch);
+}
+
+void AWallRunCharacter::UpdateCrouch(float DeltaSeconds)
+{
+	bIsCrouched = IsCrouching();
+
+	if (bWantsToCrouch && CanCrouch())
+	{
+		float const Target = CrouchHalfHeight;
+        float const Current = GetCapsuleComponent()->GetUnscaledCapsuleHalfHeight();
+        float const Next = FMath::FInterpConstantTo(Current, Target, DeltaSeconds, CrouchSpeed);
+
+        float const Alpha = (Next - StandHalfHeight) / (Target - StandHalfHeight);
+        float const NextOffset = Alpha * (CrouchCameraOffset - StandCameraOffset) + StandCameraOffset;
+
+        FVector Loc = RootComponent->GetRelativeLocation();
+        Loc.Z += Next - Current;
+
+        GetCapsuleComponent()->SetCapsuleHalfHeight(Next, true);
+        RootComponent->SetRelativeLocation(Loc);
+		float const CameraXOffset = GetFirstPersonCameraComponent()->GetRelativeLocation().X;
+		float const CameraYOffset = GetFirstPersonCameraComponent()->GetRelativeLocation().Y;
+        GetFirstPersonCameraComponent()->SetRelativeLocation(FVector(CameraXOffset, CameraYOffset, NextOffset));
+	}	
+	else if (GetCapsuleComponent()->GetUnscaledCapsuleHalfHeight() < StandHalfHeight && !bCrouchDisabled)
+	{
+		float const Target = StandHalfHeight;
+		float const Current = GetCapsuleComponent()->GetUnscaledCapsuleHalfHeight();
+		float const Next = FMath::FInterpConstantTo(Current, Target, DeltaSeconds, CrouchSpeed);
+
+		FVector Loc = RootComponent->GetRelativeLocation();
+		Loc.Z += Next - Current;
+
+		float const Alpha = (Next - CrouchHalfHeight) / (Target - CrouchHalfHeight);
+		float const NextOffset = Alpha * (StandCameraOffset - CrouchCameraOffset) + CrouchCameraOffset;
+
+		constexpr float SweepInflation = KINDA_SMALL_NUMBER * 10.f;
+		if (!GetCharacterMovement()->OverlapTest(Loc, FQuat::Identity, GetCapsuleComponent()->GetCollisionObjectType(),
+			FCollisionShape::MakeCapsule(GetCapsuleComponent()->GetScaledCapsuleRadius() + SweepInflation, Next + SweepInflation), this))
+		{
+			RootComponent->SetRelativeLocation(Loc);
+			GetCapsuleComponent()->SetCapsuleHalfHeight(Next, true);
+			GetFirstPersonCameraComponent()->SetRelativeLocation(FVector(0, 0, NextOffset));
 		}
 	}
+}
+
+
+bool AWallRunCharacter::IsCrouching() const
+{
+	float const Tolerance = (StandHalfHeight - CrouchHalfHeight) / 3.0f;
+	return GetCapsuleComponent()->GetUnscaledCapsuleHalfHeight() <= CrouchHalfHeight + Tolerance;
 }
 
 void AWallRunCharacter::Jump()

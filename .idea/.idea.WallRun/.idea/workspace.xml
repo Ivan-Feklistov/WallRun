@@ -6,19 +6,18 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="e30747f9-14f8-4dd2-9ef0-82b584270834" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/.idea/.idea.WallRun/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.WallRun/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Content/FirstPersonCPP/Blueprints/FirstPersonCharacter.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/FirstPersonCPP/Blueprints/FirstPersonCharacter.uasset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/FirstPersonCPP/Maps/FirstPersonExampleMap.umap" beforeDir="false" afterPath="$PROJECT_DIR$/Content/FirstPersonCPP/Maps/FirstPersonExampleMap.umap" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/StarterContent/Architecture/Floor_400x400.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/StarterContent/Architecture/Floor_400x400.uasset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Source/WallRun/Private/WallRunComponent.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/WallRun/Private/WallRunComponent.cpp" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Source/WallRun/Public/WallRunComponent.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/WallRun/Public/WallRunComponent.h" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Source/WallRun/WallRunCharacter.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/WallRun/WallRunCharacter.cpp" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Source/WallRun/WallRunCharacter.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/WallRun/WallRunCharacter.h" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/WallRun.uproject" beforeDir="false" afterPath="$PROJECT_DIR$/WallRun.uproject" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
     <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="HighlightingSettingsPerFile">
+    <setting file="file://C:/EpicGames/UE_4.27/Engine/Source/Runtime/Engine/Private/Components/CharacterMovementComponent.cpp" root0="SKIP_HIGHLIGHTING" />
   </component>
   <component name="MarkdownSettingsMigration">
     <option name="stateVersion" value="1" />
@@ -270,6 +269,7 @@
       <workItem from="1678547861963" duration="82000" />
       <workItem from="1678548085333" duration="149000" />
       <workItem from="1678548259486" duration="6119000" />
+      <workItem from="1679342829478" duration="7120000" />
     </task>
     <servers />
   </component>
